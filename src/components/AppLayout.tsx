@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
-import { Flame as FlameIcon, Map as MapIcon, Crown, User, Rocket } from 'lucide-react';
+import { Flame as FlameIcon, Map as MapIcon, Crown, User } from 'lucide-react';
 import DealsPage from '../pages/DealsPage';
 import MapPage from '../pages/MapPage';
 import PlusPage from '../pages/PlusPage';
 import ProfilePage from '../pages/ProfilePage';
-import MvpPage from '../pages/MvpPage';
 import { cn } from '../lib/utils';
 
-type Tab = 'deals' | 'map' | 'plus' | 'profile' | 'mvp';
+type Tab = 'deals' | 'map' | 'plus' | 'profile';
 
 const AppLayout = () => {
   const [activeTab, setActiveTab] = useState<Tab>('deals');
@@ -18,7 +17,6 @@ const AppLayout = () => {
       case 'map': return <MapPage />;
       case 'plus': return <PlusPage />;
       case 'profile': return <ProfilePage />;
-      case 'mvp': return <MvpPage />;
       default: return <DealsPage />;
     }
   };
@@ -29,24 +27,18 @@ const AppLayout = () => {
         {renderContent()}
       </main>
 
-      <nav className="h-16 bg-[#1a0a2e] border-t border-white/5 flex justify-around items-center px-2 safe-bottom z-50">
+      <nav className="h-16 bg-[#1a0a2e] border-t border-white/5 flex justify-around items-center px-4 safe-bottom z-50">
         <TabButton 
           icon={<FlameIcon size={18} className={cn("transition-all duration-300", activeTab === 'deals' ? "scale-110 text-purple-400" : "text-slate-500")} />} 
-          label="Deals" 
+          label="Discovery" 
           active={activeTab === 'deals'} 
           onClick={() => setActiveTab('deals')} 
         />
         <TabButton 
           icon={<MapIcon size={18} className={cn("transition-all duration-300", activeTab === 'map' ? "scale-110 text-purple-400" : "text-slate-500")} />} 
-          label="Map" 
+          label="Map View" 
           active={activeTab === 'map'} 
           onClick={() => setActiveTab('map')} 
-        />
-        <TabButton 
-          icon={<Rocket size={18} className={cn("transition-all duration-300", activeTab === 'mvp' ? "scale-110 text-purple-400" : "text-slate-500")} />} 
-          label="MVP" 
-          active={activeTab === 'mvp'} 
-          onClick={() => setActiveTab('mvp')} 
         />
         <TabButton 
           icon={<Crown size={18} className={cn("transition-all duration-300", activeTab === 'plus' ? "scale-110 text-purple-400" : "text-slate-500")} />} 
@@ -56,7 +48,7 @@ const AppLayout = () => {
         />
         <TabButton 
           icon={<User size={18} className={cn("transition-all duration-300", activeTab === 'profile' ? "scale-110 text-purple-400" : "text-slate-500")} />} 
-          label="User" 
+          label="Account" 
           active={activeTab === 'profile'} 
           onClick={() => setActiveTab('profile')} 
         />
