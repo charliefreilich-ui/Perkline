@@ -1,0 +1,62 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+@theme {
+  --color-background: #0f071a;
+  --color-panel: #1a0a2e;
+  --color-card: #2d1b4e;
+  --color-accent: #9333ea;
+  
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+:root {
+  background-color: #0f071a;
+  color: #f1f5f9; /* slate-100 */
+}
+
+body {
+  margin: 0;
+  background-color: #0f071a;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+}
+
+/* Hide scrollbars for a mobile feel */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Leaflet light-to-purple theme tweaks */
+.leaflet-container {
+  background: #f3e8ff !important;
+}
+
+.leaflet-tile {
+  /* This filter targets light tiles (white bg, grey lines) 
+     It inverts colors, hue-rotates to purple, and brings brightness back up 
+     to achieve a light purple background with dark lines.
+  */
+  filter: invert(100%) hue-rotate(240deg) brightness(1.4) contrast(0.7) opacity(1);
+}
+
+.leaflet-control-attribution {
+  background: rgba(243, 232, 255, 0.7) !important;
+  color: rgba(26, 10, 46, 0.4) !important;
+  font-size: 8px !important;
+}
+
+.leaflet-control-attribution a {
+  color: rgba(147, 51, 234, 0.6) !important;
+}
+
+/* Safe areas for mobile */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}

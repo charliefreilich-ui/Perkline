@@ -1,0 +1,66 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Phase 3: Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Layer 2: Validation Blueprints
+    function isValidUser(data) {
+      return data.keys().hasAll(['displayName', 'email', 'totalSavings', 'dealsUsedCount']) &&
+             data.keys().size() >= 4 &&
+             data.displayName is string && data.displayName.size() <= 100 &&
+             data.email is string && data.email.size() <= 150 &&
+             data.totalSavings is number &&
+             data.dealsUsedCount is int;
+    }
+
+    function isValidActivity(data) {
+      return data.keys().hasAll(['dealId', 'business', 'savings', 'date']) &&
+             data.keys().size() == 4 &&
+             data.dealId is string && data.dealId.size() <= 128 &&
+             data.business is string && data.business.size() <= 150 &&
+             data.savings is number &&
+             data.date is string; // Simplified for this turn
+    }
+
+    // Layer 1: The Master Gate
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow update: if isOwner(userId) && isValidUser(incoming()) && (
+        // Allow updating stats and profile info
+        incoming().diff(existing()).affectedKeys().hasAny(['displayName', 'photoURL', 'totalSavings', 'dealsUsedCount', 'isPlus', 'updatedAt'])
+      );
+
+      match /activity/{activityId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidActivity(incoming());
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}

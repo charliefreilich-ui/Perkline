@@ -1,0 +1,6 @@
+{
+  "name": "Perkline",
+  "description": "Local deals discovery app for Davis, CA featuring real-time rewards, map view, and premium perks.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": []
+}

@@ -1,0 +1,41 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Stores user account information and aggregate savings stats.",
+      "type": "object",
+      "properties": {
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "isPlus": { "type": "boolean" },
+        "totalSavings": { "type": "number" },
+        "dealsUsedCount": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["displayName", "email", "totalSavings", "dealsUsedCount"]
+    },
+    "Activity": {
+      "title": "User Activity",
+      "description": "A record of a deal being used by a user.",
+      "type": "object",
+      "properties": {
+        "dealId": { "type": "string" },
+        "business": { "type": "string" },
+        "savings": { "type": "number" },
+        "date": { "type": "string", "format": "date-time" }
+      },
+      "required": ["dealId", "business", "savings", "date"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile documents."
+    },
+    "/users/{userId}/activity/{activityId}": {
+      "schema": "Activity",
+      "description": "Records of deals claimed by the user."
+    }
+  }
+}
