@@ -1,48 +1,91 @@
 import React, { useState, useEffect } from 'react';
-import { User, Settings, Bell, HelpCircle, LogOut, ChevronRight, Building, MapPin, Phone, Globe, Info, Heart, Crown, LogIn } from 'lucide-react';
+import { User, Settings, Bell, HelpCircle, LogOut, ChevronRight, Building, MapPin, Phone, Globe, Info, Heart, LogIn, PieChart, TrendingUp, Eye, BarChart3, Map as MapIcon, Star, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../hooks/useAuth';
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { LogoImage } from '../components/LogoImage';
 
 interface ActivityRecord {
   id: string;
   business: string;
   savings: number;
   date: string;
+  logo?: string;
+  emoji?: string;
 }
 
-const ProfilePage = () => {
-  const { user, profile, loading, signIn, signOut } = useAuth();
+interface ProfilePageProps {
+  onNavigateToSavings: () => void;
+}
+
+const ProfilePage = ({ onNavigateToSavings }: ProfilePageProps) => {
+  const { user, profile, loading, signIn, signOut, isMerchant } = useAuth();
   const [showClaimModal, setShowClaimModal] = useState(false);
   const [claimSubmitted, setClaimSubmitted] = useState(false);
   const [activities, setActivities] = useState<ActivityRecord[]>([]);
+  const [monthlySavings, setMonthlySavings] = useState(0);
+  const [isMerchantMode, setIsMerchantMode] = useState(false);
+
+  useEffect(() => {
+    // If merchant mode is true but user isn't a merchant, reset it
+    if (isMerchantMode && !isMerchant) {
+      setIsMerchantMode(false);
+    }
+  }, [isMerchant, isMerchantMode]);
+
+  const merchantStats = [
+    { label: 'Total Impressions', value: '1,284', icon: <Eye size={14} />, trend: '+12%' },
+    { label: 'Deal Claims', value: '342', icon: <TrendingUp size={14} />, trend: '+8%' },
+    { label: 'Map Clicks', value: '561', icon: <MapPin size={14} />, trend: '+15%' },
+  ];
 
   useEffect(() => {
     if (user) {
       const activityRef = collection(db, 'users', user.uid, 'activity');
-      const q = query(activityRef, orderBy('date', 'desc'), limit(5));
+      const q = query(activityRef, orderBy('date', 'desc'), limit(50));
       
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const records = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         })) as ActivityRecord[];
-        setActivities(records);
+        setActivities(records.slice(0, 5));
+
+        // Calculate monthly savings (last 30 days)
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        
+        const monthlyTotal = records.reduce((acc, curr) => {
+          if (new Date(curr.date) >= thirtyDaysAgo) {
+            return acc + curr.savings;
+          }
+          return acc;
+        }, 0);
+        setMonthlySavings(monthlyTotal);
       });
 
       return () => unsubscribe();
     }
   }, [user]);
 
-  const handleClaimSubmit = (e: React.FormEvent) => {
+  const handleClaimSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return;
+
     setClaimSubmitted(true);
+    
+    // Update profile in Firestore to make them a merchant
+    const { doc, updateDoc } = await import('firebase/firestore');
+    const userRef = doc(db, 'users', user.uid);
+    await updateDoc(userRef, { isMerchant: true });
+
     setTimeout(() => {
       setShowClaimModal(false);
       setClaimSubmitted(false);
-    }, 3000);
+      setIsMerchantMode(true);
+    }, 2000);
   };
 
   if (loading) {
@@ -61,7 +104,7 @@ const ProfilePage = () => {
            <Trophy size={48} className="text-white" />
         </div>
         <h2 className="text-3xl font-black text-white italic tracking-tighter uppercase mb-2">Unlock Exclusive Davis Deals</h2>
-        <p className="text-slate-500 text-sm font-medium mb-8 leading-relaxed max-w-xs">Sign in with Google to start tracking your savings and access Plus-only perks across Davis.</p>
+        <p className="text-slate-500 text-sm font-medium mb-8 leading-relaxed max-w-xs">Sign in with Google to start tracking your savings and access exclusive perks across Davis.</p>
         <button 
           onClick={signIn}
           className="w-full h-16 bg-white text-[#1a0a2e] rounded-2xl font-bold text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-transform flex items-center justify-center gap-3"
@@ -94,43 +137,119 @@ const ProfilePage = () => {
       </header>
 
       <div className="px-6 space-y-6 pb-24">
-        {/* Savings Card */}
-        <div className="bg-[#2d1b4e] rounded-3xl p-6 border border-white/10 shadow-2xl relative overflow-hidden">
+        {/* View Toggle - Only for merchants */}
+        {isMerchant && (
+          <div className="bg-[#1a0a2e] p-1 rounded-2xl flex border border-white/5">
+            <button 
+              onClick={() => setIsMerchantMode(false)}
+              className={cn(
+                "flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                !isMerchantMode ? "bg-purple-600 text-white shadow-lg" : "text-slate-500 hover:text-slate-300"
+              )}
+            >
+              User Profile
+            </button>
+            <button 
+              onClick={() => setIsMerchantMode(true)}
+              className={cn(
+                "flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2",
+                isMerchantMode ? "bg-purple-600 text-white shadow-lg" : "text-slate-500 hover:text-slate-300"
+              )}
+            >
+              <Building size={12} />
+              Merchant View
+            </button>
+          </div>
+        )}
+
+        {isMerchantMode && isMerchant ? (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="space-y-6"
+          >
+            {/* Merchant Dashboard Preview */}
+            <div className="bg-[#2d1b4e] rounded-[32px] p-6 border border-white/10 shadow-2xl relative overflow-hidden">
+               <div className="flex justify-between items-center mb-6">
+                 <div>
+                   <h2 className="text-xl font-bold text-white tracking-tight leading-none mb-1">Merchant Analytics</h2>
+                   <p className="text-[10px] font-bold text-purple-300 uppercase tracking-widest">Prototype Preview</p>
+                 </div>
+                 <div className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center border border-white/10">
+                   <BarChart3 size={18} className="text-purple-400" />
+                 </div>
+               </div>
+
+               <div className="grid grid-cols-3 gap-2 mb-8">
+                 {merchantStats.map((stat, i) => (
+                   <div key={i} className="bg-black/20 p-3 rounded-2xl border border-white/5">
+                     <div className="text-purple-400 mb-2">{stat.icon}</div>
+                     <p className="text-lg font-bold text-white mb-0.5 leading-none">{stat.value}</p>
+                     <p className="text-[7px] font-bold text-slate-500 uppercase tracking-widest leading-tight">{stat.label}</p>
+                     <span className="text-[7px] font-black text-green-400 mt-1 block tracking-tighter">{stat.trend}</span>
+                   </div>
+                 ))}
+               </div>
+
+               {/* Map Heatmap Concept */}
+               <div className="space-y-4">
+                 <h4 className="text-[10px] uppercase font-bold text-slate-500 tracking-widest flex items-center gap-2">
+                   <MapIcon size={12} />
+                   Claim Heatmap (Conceptual)
+                 </h4>
+                 <div className="h-32 bg-[#1a0a2e] rounded-2xl border border-white/5 relative overflow-hidden flex items-center justify-center">
+                    <div className="absolute inset-0 opacity-20 bg-gradient-to-br from-purple-500/20 via-transparent to-pink-500/20"></div>
+                    <div className="relative z-10 text-center px-6">
+                      <div className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-ping mx-auto mb-2 shadow-[0_0_10px_rgba(168,85,247,0.5)]"></div>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase leading-relaxed tracking-wider">
+                        Real-time heatmap of user interactions would populate here for partner merchants.
+                      </p>
+                    </div>
+                 </div>
+               </div>
+            </div>
+
+            <section className="bg-purple-600/10 border border-purple-500/20 rounded-[32px] p-6 text-center">
+              <Star size={24} className="mx-auto text-yellow-400 mb-4 fill-yellow-400" />
+              <h4 className="text-lg font-bold text-white mb-2 uppercase tracking-tight italic">Boost Your Visibility</h4>
+              <p className="text-[11px] text-purple-200/60 font-medium mb-6 leading-relaxed">Merchants can sponsor their placement to appear first in the "Discover" feed for local Davis residents.</p>
+              <button className="w-full bg-white text-[#1a0a2e] py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest active:scale-95 transition-all shadow-lg">
+                Explore Sponsored Slots
+              </button>
+            </section>
+          </motion.div>
+        ) : (
+          <>
+            {/* Savings Card */}
+            <div className="bg-[#2d1b4e] rounded-3xl p-6 border border-white/10 shadow-2xl relative overflow-hidden">
           <div className="absolute -right-4 -top-4 w-24 h-24 bg-purple-500/10 rounded-full blur-2xl"></div>
-          <p className="text-[10px] font-bold text-purple-300 uppercase tracking-widest mb-1">Lifetime Savings</p>
-          <h2 className="text-4xl font-bold text-white mb-4">${profile?.totalSavings.toFixed(2) || '0.00'}</h2>
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <p className="text-[10px] font-bold text-purple-300 uppercase tracking-widest mb-1">Lifetime Savings</p>
+              <h2 className="text-4xl font-bold text-white">${profile?.totalSavings.toFixed(2) || '0.00'}</h2>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] font-bold text-purple-300 uppercase tracking-widest mb-1">Monthly</p>
+              <p className="text-xl font-bold text-white">${monthlySavings.toFixed(2)}</p>
+            </div>
+          </div>
           
           <div className="flex items-center justify-between">
             <StatSmall label="Deals Used" value={profile?.dealsUsedCount?.toString() || '0'} />
             <div className="w-px h-8 bg-white/10"></div>
-            <StatSmall label="Status" value={profile?.isPlus ? 'PLUS' : 'BASIC'} />
-            <div className="w-px h-8 bg-white/10"></div>
             <StatSmall label="Rank" value="--" />
           </div>
-        </div>
 
-        {/* Plus Upsell */}
-        {(!profile?.isPlus) && (
-          <div className="bg-gradient-to-br from-purple-900 to-[#1a0a2e] rounded-3xl p-6 border border-purple-500/30 flex flex-col gap-4">
-            <div className="flex items-center gap-2 text-yellow-500">
-              <Crown size={20} fill="currentColor" />
-              <span className="text-xs font-bold uppercase tracking-widest">Plus Membership Benefits</span>
-            </div>
-            <ul className="text-xs space-y-3 text-slate-300">
-              <li className="flex items-center gap-3">
-                <div className="w-1.5 h-1.5 rounded-full bg-purple-400"></div>
-                Priority notification for flash deals
-              </li>
-              <li className="flex items-center gap-3">
-                <div className="w-1.5 h-1.5 rounded-full bg-purple-400"></div>
-                Exclusive merchant rewards in Davis
-              </li>
-            </ul>
-            <button className="w-full py-3.5 bg-white text-[#1a0a2e] rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-colors mt-2">
-              Upgrade to Premium
-            </button>
-          </div>
-        )}
+          {/* Analytics Entry Button */}
+          <button 
+            onClick={onNavigateToSavings}
+            className="w-full mt-6 bg-white/5 border border-white/10 py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-white/10 transition-colors group"
+          >
+            <PieChart size={14} className="text-purple-400 group-hover:scale-110 transition-transform" />
+            <span className="text-[10px] font-bold text-white uppercase tracking-widest">View Savings Analytics</span>
+            <ChevronRight size={14} className="text-slate-500 ml-1" />
+          </button>
+        </div>
 
         {/* Recent Activity */}
         <section>
@@ -139,8 +258,8 @@ const ProfilePage = () => {
             <div className="space-y-4">
               {activities.map((activity, i) => (
                 <div key={activity.id} className="flex items-center gap-4 group">
-                  <div className="w-10 h-10 rounded-full bg-[#1a0a2e] border border-white/5 flex items-center justify-center text-xl shadow-inner">
-                     {activity.business.includes('Pizza') ? '🍕' : activity.business.includes('Tea') ? '🍹' : '🎟️'}
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#2d1b4e] to-[#0f071a] border border-white/5 flex items-center justify-center p-2 shadow-inner overflow-hidden">
+                    <LogoImage src={activity.logo} alt={activity.business} emoji={activity.emoji || '🎫'} className="w-full h-full" />
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-slate-200">{activity.business}</p>
@@ -158,18 +277,20 @@ const ProfilePage = () => {
           )}
         </section>
 
-        {/* Business Claim */}
-        <section className="bg-[#1a0a2e] border border-white/10 rounded-[32px] p-6 text-center">
-          <Building size={24} className="mx-auto text-purple-500 mb-4" />
-          <h4 className="text-lg font-bold text-white mb-2 uppercase tracking-tight">Are you a Local Merchant?</h4>
-          <p className="text-[11px] text-slate-500 font-medium mb-6 leading-relaxed">Partner with Perkline to grow your presence in Davis. List deals and track real-time analytics.</p>
-          <button 
-            onClick={() => setShowClaimModal(true)}
-            className="w-full bg-[#2d1b4e] text-purple-400 border border-purple-500/30 py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest active:bg-purple-500 active:text-white transition-all shadow-lg"
-          >
-            Merchant Portal
-          </button>
-        </section>
+        {/* Business Claim - Only for non-merchants */}
+        {!isMerchant && (
+          <section className="bg-[#1a0a2e] border border-white/10 rounded-[32px] p-6 text-center">
+            <Building size={24} className="mx-auto text-purple-500 mb-4" />
+            <h4 className="text-lg font-bold text-white mb-2 uppercase tracking-tight">Are you a Local Merchant?</h4>
+            <p className="text-[11px] text-slate-500 font-medium mb-6 leading-relaxed">Partner with Perkline to grow your presence in Davis. List deals and track real-time analytics.</p>
+            <button 
+              onClick={() => setShowClaimModal(true)}
+              className="w-full bg-[#2d1b4e] text-purple-400 border border-purple-500/30 py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest active:bg-purple-500 active:text-white transition-all shadow-lg"
+            >
+              Sign up as Merchant
+            </button>
+          </section>
+        )}
 
         {/* Menu Items */}
         <div className="space-y-1">
@@ -178,7 +299,9 @@ const ProfilePage = () => {
           <MenuItem icon={<HelpCircle size={18} />} label="Customer Support" />
           <MenuItem icon={<LogOut size={18} />} label="Sign Out of Session" danger onClick={signOut} />
         </div>
-      </div>
+      </>
+    )}
+  </div>
 
       {/* Claim Modal */}
       <AnimatePresence>
@@ -208,19 +331,28 @@ const ProfilePage = () => {
               ) : (
                 <>
                   <div className="flex justify-between items-center mb-8">
-                    <h2 className="text-xl font-black text-white italic tracking-widest uppercase">Merchant Portal</h2>
+                    <h2 className="text-xl font-black text-white italic tracking-widest uppercase">Merchant Registration</h2>
                     <button onClick={() => setShowClaimModal(false)} className="text-slate-500 hover:text-white transition-colors">
                       <LogOut size={24} className="rotate-180" />
                     </button>
                   </div>
                   <form onSubmit={handleClaimSubmit} className="space-y-6">
-                    <InputGroup label="Entity Name" placeholder="Business name in Davis" icon={<Building size={16} />} />
-                    <InputGroup label="Address" placeholder="Street Location" icon={<MapPin size={16} />} />
-                    <InputGroup label="Point of Contact" placeholder="Email or Phone" icon={<Phone size={16} />} />
+                    <div className="bg-purple-600/10 p-4 rounded-2xl border border-purple-500/20 mb-6">
+                       <div className="flex items-center gap-3 text-purple-400 mb-2">
+                         <Info size={16} />
+                         <span className="text-[10px] font-black uppercase tracking-widest">Partner Terms</span>
+                       </div>
+                       <p className="text-[10px] text-slate-400 font-medium leading-relaxed">By registering, you agree to our 25¢ per-scan featured boost model. You will receive access to the merchant portal immediately.</p>
+                    </div>
+
+                    <InputGroup label="Merchant Name" placeholder="Business name in Davis" icon={<Building size={16} />} />
+                    <InputGroup label="Business Address" placeholder="Street Location" icon={<MapPin size={16} />} />
+                    <InputGroup label="Contact Info" placeholder="Email or Phone" icon={<Phone size={16} />} />
                     
                     <div className="pt-6">
-                      <button type="submit" className="w-full h-14 bg-white text-[#1a0a2e] rounded-2xl font-bold text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-transform">
-                        Verify Merchant Identity
+                      <button type="submit" className="w-full h-14 bg-white text-[#1a0a2e] rounded-2xl font-bold text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-transform flex items-center justify-center gap-2">
+                        <ShieldCheck size={18} />
+                        Become a Partner
                       </button>
                     </div>
                   </form>

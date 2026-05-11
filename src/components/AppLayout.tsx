@@ -1,22 +1,26 @@
 import React, { useState } from 'react';
-import { Flame as FlameIcon, Map as MapIcon, Crown, User } from 'lucide-react';
+import { Flame as FlameIcon, Map as MapIcon, User, ShieldCheck } from 'lucide-react';
 import DealsPage from '../pages/DealsPage';
 import MapPage from '../pages/MapPage';
-import PlusPage from '../pages/PlusPage';
 import ProfilePage from '../pages/ProfilePage';
+import SavingsPage from '../pages/SavingsPage';
+import AdminPage from '../pages/AdminPage';
 import { cn } from '../lib/utils';
+import { useAuth } from '../hooks/useAuth';
 
-type Tab = 'deals' | 'map' | 'plus' | 'profile';
+type Tab = 'deals' | 'map' | 'profile' | 'savings' | 'admin';
 
 const AppLayout = () => {
   const [activeTab, setActiveTab] = useState<Tab>('deals');
+  const { isMerchant } = useAuth();
 
   const renderContent = () => {
     switch (activeTab) {
       case 'deals': return <DealsPage />;
       case 'map': return <MapPage />;
-      case 'plus': return <PlusPage />;
-      case 'profile': return <ProfilePage />;
+      case 'profile': return <ProfilePage onNavigateToSavings={() => setActiveTab('savings')} />;
+      case 'savings': return <SavingsPage onBack={() => setActiveTab('profile')} />;
+      case 'admin': return <AdminPage />;
       default: return <DealsPage />;
     }
   };
@@ -30,28 +34,30 @@ const AppLayout = () => {
       <nav className="h-16 bg-[#1a0a2e] border-t border-white/5 flex justify-around items-center px-4 safe-bottom z-50">
         <TabButton 
           icon={<FlameIcon size={18} className={cn("transition-all duration-300", activeTab === 'deals' ? "scale-110 text-purple-400" : "text-slate-500")} />} 
-          label="Discovery" 
+          label="Deals" 
           active={activeTab === 'deals'} 
           onClick={() => setActiveTab('deals')} 
         />
         <TabButton 
           icon={<MapIcon size={18} className={cn("transition-all duration-300", activeTab === 'map' ? "scale-110 text-purple-400" : "text-slate-500")} />} 
-          label="Map View" 
+          label="Map" 
           active={activeTab === 'map'} 
           onClick={() => setActiveTab('map')} 
         />
         <TabButton 
-          icon={<Crown size={18} className={cn("transition-all duration-300", activeTab === 'plus' ? "scale-110 text-purple-400" : "text-slate-500")} />} 
-          label="Plus" 
-          active={activeTab === 'plus'} 
-          onClick={() => setActiveTab('plus')} 
-        />
-        <TabButton 
           icon={<User size={18} className={cn("transition-all duration-300", activeTab === 'profile' ? "scale-110 text-purple-400" : "text-slate-500")} />} 
-          label="Account" 
+          label="Me" 
           active={activeTab === 'profile'} 
           onClick={() => setActiveTab('profile')} 
         />
+        {isMerchant && (
+          <TabButton 
+            icon={<ShieldCheck size={18} className={cn("transition-all duration-300", activeTab === 'admin' ? "scale-110 text-purple-400" : "text-slate-500")} />} 
+            label="Dash" 
+            active={activeTab === 'admin'} 
+            onClick={() => setActiveTab('admin')} 
+          />
+        )}
       </nav>
     </div>
   );
@@ -73,7 +79,7 @@ const TabButton = ({ icon, label, active, onClick }: TabButtonProps) => (
     )}
   >
     {icon}
-    <span className="text-[10px] font-bold uppercase tracking-widest">{label}</span>
+    <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">{label}</span>
   </button>
 );
 

@@ -8,15 +8,18 @@ interface UserProfile {
   displayName: string;
   email: string;
   photoURL: string;
-  isPlus: boolean;
   totalSavings: number;
   dealsUsedCount: number;
+  isAdmin?: boolean;
+  isMerchant?: boolean;
 }
 
 interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
   loading: boolean;
+  isAdmin: boolean;
+  isMerchant: boolean;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -28,16 +31,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const isAdmin = user?.email?.toLowerCase() === 'charlie.freilich@gmail.com';
+  const isMerchant = isAdmin || user?.email?.toLowerCase() === 'clfreilich@ucdavis.edu' || profile?.isMerchant === true;
+
   useEffect(() => {
+    let unsubProfile: (() => void) | null = null;
+
     const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
       setUser(authUser);
       
+      // Clear previous listener if any
+      if (unsubProfile) {
+        unsubProfile();
+        unsubProfile = null;
+      }
+
       if (authUser) {
         // Sync/Fetch profile
         const userRef = doc(db, 'users', authUser.uid);
         
         // Use onSnapshot for real-time updates to savings/stats
-        const unsubProfile = onSnapshot(userRef, (docSnap) => {
+        unsubProfile = onSnapshot(userRef, (docSnap) => {
           if (docSnap.exists()) {
             setProfile({ uid: authUser.uid, ...docSnap.data() } as UserProfile);
           } else {
@@ -46,7 +60,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               displayName: authUser.displayName || 'Guest',
               email: authUser.email || '',
               photoURL: authUser.photoURL || '',
-              isPlus: false,
               totalSavings: 0,
               dealsUsedCount: 0,
               updatedAt: new Date().toISOString()
@@ -54,19 +67,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setDoc(userRef, newProfile).catch(err => handleFirestoreError(err, OperationType.WRITE, `users/${authUser.uid}`));
             setProfile({ uid: authUser.uid, ...newProfile } as UserProfile);
           }
+          setLoading(false);
         }, (error) => {
-          handleFirestoreError(error, OperationType.GET, `users/${authUser.uid}`);
+          // Ignore permission errors during sign out transitions
+          if (error.code !== 'permission-denied') {
+            handleFirestoreError(error, OperationType.GET, `users/${authUser.uid}`);
+          }
+          setLoading(false);
         });
-
-        setLoading(false);
-        return () => unsubProfile();
       } else {
         setProfile(null);
         setLoading(false);
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      if (unsubProfile) unsubProfile();
+    };
   }, []);
 
   const signIn = async () => {
@@ -81,7 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signIn, signOut: signOutUser }}>
+    <AuthContext.Provider value={{ user, profile, loading, isAdmin, isMerchant, signIn, signOut: signOutUser }}>
       {children}
     </AuthContext.Provider>
   );

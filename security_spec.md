@@ -2,7 +2,7 @@
 
 ## Data Invariants
 - A user can only access their own profile and activity history.
-- The `isPlus` field and `totalSavings` should ideally be protected, but for this app, we'll allow the user to update their own stats for simplicity in this turn, while acknowledging that in a production app, savings might be calculated server-side or validated.
+- The `totalSavings` field should ideally be protected, but for this app, we'll allow the user to update their own stats for simplicity in this turn, while acknowledging that in a production app, savings might be calculated server-side or validated.
 - User IDs must match the authenticated user's UID.
 
 ## The "Dirty Dozen" Payloads (Red Team Test Cases)

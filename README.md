@@ -10,7 +10,7 @@ To create a seamless, high-performance bridge between local Davis businesses and
 - **Dynamic Map View**: Interactive Leaflet-powered map to find deals nearest to you.
 - **Identity & Personalization**: Full authentication via Google (Firebase), allowing users to track their personal lifetime savings.
 - **Merchant Verification**: Real-time verification links to official merchant sources for every perk.
-- **Premium Tier (Plus)**: Exclusive infrastructure for premium members to access priority rewards.
+- **Tiered Savings**: Exclusive infrastructure for members to access priority rewards.
 
 ## 🛠 Tech Stack
 - **Frontend**: React 18, TypeScript, Vite
@@ -26,7 +26,7 @@ To create a seamless, high-performance bridge between local Davis businesses and
   /components  - Reusable UI atoms and layouts
   /hooks       - Custom business logic (Auth, Location, Deal Refresh)
   /lib         - Firebase configuration and initialized services
-  /pages       - Top-level route views (Deals, Map, Plus, Profile)
+  /pages       - Top-level route views (Deals, Map, Profile)
   /data        - Mock data and type definitions
 ```
 

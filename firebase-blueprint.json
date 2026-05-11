@@ -2,22 +2,68 @@
   "entities": {
     "User": {
       "title": "User Profile",
-      "description": "Stores user account information and aggregate savings stats.",
+      "description": "User account information and statistics",
       "type": "object",
       "properties": {
         "displayName": { "type": "string" },
         "email": { "type": "string" },
         "photoURL": { "type": "string" },
-        "isPlus": { "type": "boolean" },
         "totalSavings": { "type": "number" },
         "dealsUsedCount": { "type": "number" },
+        "isAdmin": { "type": "boolean" },
+        "isMerchant": { "type": "boolean" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["displayName", "email", "totalSavings", "dealsUsedCount"]
+      "required": ["email"]
+    },
+    "Business": {
+      "title": "Business",
+      "description": "Information about a business offering deals",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "logo": { "type": "string" },
+        "image": { "type": "string" },
+        "address": { "type": "string" },
+        "lat": { "type": "number" },
+        "lng": { "type": "number" },
+        "businessType": { "type": "string" },
+        "emoji": { "type": "string" },
+        "rating": { "type": "number" },
+        "totalFeaturedRevenue": { "type": "number" }
+      },
+      "required": ["name", "address"]
+    },
+    "Deal": {
+      "title": "Deal",
+      "description": "A specific discount or offer from a business",
+      "type": "object",
+      "properties": {
+        "businessId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "discount": { "type": "string" },
+        "originalPrice": { "type": "number" },
+        "dealPrice": { "type": "number" },
+        "savings": { "type": "number" },
+        "category": { "type": "string" },
+        "cuisine": { "type": "string" },
+        "expiresAt": { "type": "string" },
+        "activeDays": { "type": "array" },
+        "activeStart": { "type": "string" },
+        "activeEnd": { "type": "string" },
+        "dealUrl": { "type": "string" },
+        "sourceType": { "type": "string" },
+        "isNew": { "type": "boolean" },
+        "isFeatured": { "type": "boolean" },
+        "featuredScanCount": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["businessId", "title", "discount"]
     },
     "Activity": {
       "title": "User Activity",
-      "description": "A record of a deal being used by a user.",
+      "description": "Log of deals claimed by the user",
       "type": "object",
       "properties": {
         "dealId": { "type": "string" },
@@ -29,13 +75,9 @@
     }
   },
   "firestore": {
-    "/users/{userId}": {
-      "schema": "User",
-      "description": "User profile documents."
-    },
-    "/users/{userId}/activity/{activityId}": {
-      "schema": "Activity",
-      "description": "Records of deals claimed by the user."
-    }
+    "/users/{userId}": { "schema": "User", "description": "Global user profiles" },
+    "/users/{userId}/activity/{activityId}": { "schema": "Activity", "description": "User claim history" },
+    "/businesses/{businessId}": { "schema": "Business", "description": "Directory of businesses" },
+    "/deals/{dealId}": { "schema": "Deal", "description": "Collection of all deals" }
   }
 }

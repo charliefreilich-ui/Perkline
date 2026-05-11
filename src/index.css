@@ -9,6 +9,13 @@
   --color-accent: #9333ea;
   
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+
+  @keyframes scanner-line {
+    0% { top: 0; }
+    100% { top: 100%; }
+  }
+  
+  --animate-scanner-line: scanner-line 2s linear infinite;
 }
 
 :root {

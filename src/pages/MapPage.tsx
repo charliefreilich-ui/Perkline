@@ -3,12 +3,30 @@ import { MapContainer, TileLayer, Marker, useMap, Circle } from 'react-leaflet';
 import L from 'leaflet';
 import { useDealRefresh } from '../hooks/useDealRefresh';
 import { useUserLocation } from '../hooks/useUserLocation';
-import { Crosshair, Filter, ChevronRight, Star, Clock, MapPin, Utensils, Beer, Trophy, Info } from 'lucide-react';
+import { 
+  Crosshair, 
+  Filter, 
+  ChevronRight, 
+  Star, 
+  Clock, 
+  MapPin, 
+  Utensils, 
+  Beer, 
+  Trophy, 
+  Info,
+  CheckCircle2, 
+  AlertCircle, 
+  X,
+  QrCode,
+  ExternalLink
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { initialDeals, upcomingDeals, type Deal } from '../data/mockData';
 import { useAuth } from '../hooks/useAuth';
 import { claimDeal } from '../lib/deals';
+import { LogoImage } from '../components/LogoImage';
+import QRScanner from '../components/QRScanner';
 
 // Leaflet default icon fix
 import 'leaflet/dist/leaflet.css';
@@ -21,36 +39,58 @@ const MapPage = () => {
   const { user, signIn } = useAuth();
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
   const [filter, setFilter] = useState<'all' | 'food' | 'drinks' | 'activities'>('all');
+  const [showScanner, setShowScanner] = useState(false);
+  const [activeScannerDeal, setActiveScannerDeal] = useState<Deal | null>(null);
+  const [scanStatus, setScanStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
-  // Combine all known deals for the map
-  const allKnownDeals = useMemo(() => {
-    const combined = [...deals];
-    upcomingDeals.forEach((d) => {
-      if (!combined.some(existing => existing.id === d.id)) {
-        combined.push(d);
-      }
-    });
-    return combined;
-  }, [deals]);
+  // Use deals from hook (synced with Firestore)
+  const allKnownDeals = useMemo(() => deals, [deals]);
 
   const filteredDeals = useMemo(() => {
     if (filter === 'all') return allKnownDeals;
     return allKnownDeals.filter(d => d.category === filter);
   }, [allKnownDeals, filter]);
 
-  const handleClaim = async (deal: Deal) => {
-    if (!user) {
-      signIn();
-      return;
-    }
+  const recordClaim = (deal: Deal) => {
+    if (!user) return;
     
-    await claimDeal(user.uid, {
+    // Fire and forget claim record
+    claimDeal(user.uid, {
       id: deal.id,
       business: deal.business,
       savings: deal.savings
     });
-    
-    window.open(deal.dealUrl, '_blank');
+  };
+
+  const handleStartScan = (deal: Deal) => {
+    if (!user) {
+      signIn();
+      return;
+    }
+    setActiveScannerDeal(deal);
+    setShowScanner(true);
+    setScanStatus('idle');
+  };
+
+  const handleScanSuccess = (decodedText: string) => {
+    if (!activeScannerDeal) return;
+
+    if (decodedText === activeScannerDeal.qrSecret) {
+      setScanStatus('success');
+      recordClaim(activeScannerDeal);
+      
+      // Auto-close after success
+      setTimeout(() => {
+        setShowScanner(false);
+        setActiveScannerDeal(null);
+        setScanStatus('idle');
+        setSelectedDeal(null);
+      }, 2000);
+    } else {
+      setScanStatus('error');
+      // Briefly show error then reset to idle to allow rescan
+      setTimeout(() => setScanStatus('idle'), 3000);
+    }
   };
 
   const MapController = ({ location, deal }: { location: [number, number] | null, deal: Deal | null }) => {
@@ -67,15 +107,60 @@ const MapPage = () => {
     return null;
   };
 
-  const createMarkerIcon = (deal: Deal) => {
-    const color = deal.isPlusOnly ? '#eab308' : '#9333ea';
-    const emoji = deal.emoji || '📍';
+  const createMarkerIcon = (deal: any) => {
+    let domain = '';
+    
+    // Priority 1: Use explicit business website
+    if (deal.website) {
+       try {
+         domain = new URL(deal.website.includes('://') ? deal.website : `https://${deal.website}`).hostname.replace(/^www\./, '');
+       } catch {
+         domain = deal.website;
+       }
+    }
+    
+    // Priority 2: Use logo URL extraction
+    if (!domain && deal.logo) {
+      if (deal.logo.includes('clearbit.com') || deal.logo.includes('icon.horse')) {
+        domain = deal.logo.split('/').pop()?.split('?')[0] || '';
+      } else {
+        try {
+          domain = new URL(deal.logo).hostname.replace(/^www\./, '');
+        } catch {
+           domain = '';
+        }
+      }
+    }
+
+    // Priority 3: Use deal URL
+    if (!domain && deal.dealUrl) {
+      try {
+        domain = new URL(deal.dealUrl).hostname.replace(/^www\./, '');
+      } catch {
+        domain = '';
+      }
+    }
+    
+    // Fallback: sanitized business name
+    if (!domain || !domain.includes('.')) {
+      domain = deal.business.toLowerCase().replace(/[^a-z0-9]/g, '') + '.com';
+    }
+    
+    // Fallback logo source order - matching LogoImage component logic
+    const fallbacks = [
+      deal.logo,
+      `https://icon.horse/icon/${domain}`,
+      `https://logo.clearbit.com/${domain}`,
+      `https://icons.duckduckgo.com/ip3/${domain}.ico`,
+      `https://www.google.com/s2/favicons?domain=${domain}&sz=128`
+    ].filter(Boolean);
+    
+    const logoSrc = fallbacks[0];
     
     return L.divIcon({
       html: `
-        <div class="relative flex items-center justify-center w-10 h-10 rounded-full bg-[#0f071a] border-2 border-purple-500/30 shadow-2xl transform hover:scale-110 active:scale-95 transition-all">
-          <span class="text-xl">${emoji}</span>
-          <div class="absolute -top-1 -right-1 w-3 h-3 bg-[${color}] rounded-full border-2 border-[#0f071a]"></div>
+        <div class="relative flex items-center justify-center w-10 h-10 rounded-full bg-white border-2 border-purple-500 shadow-2xl transform hover:scale-110 active:scale-95 transition-all overflow-hidden p-1.5">
+          ${logoSrc ? `<img src="${logoSrc}" class="w-full h-full object-contain" onerror="this.src='https://icon.horse/icon/${domain}'; this.onerror=null;" />` : `<span class="text-xl">${deal.emoji}</span>`}
         </div>
       `,
       className: '',
@@ -161,17 +246,11 @@ const MapPage = () => {
                 selectedDeal?.id === deal.id ? "border-purple-600/50" : "border-white/5 opacity-90"
               )}
             >
-              <div className="w-16 h-16 rounded-xl bg-[#0f071a] flex items-center justify-center shrink-0 overflow-hidden border border-white/5">
-                {deal.image ? (
-                  <img src={deal.image} className="w-full h-full object-cover" alt="" />
-                ) : (
-                  <div className="text-2xl opacity-60 grayscale">
-                    {deal.emoji}
-                  </div>
-                )}
+              <div className="w-16 h-16 rounded-xl bg-[#2d1b4e]/50 flex items-center justify-center shrink-0 overflow-hidden border border-white/5 relative p-3">
+                <LogoImage src={deal.logo} website={deal.website} alt={deal.business} emoji={deal.emoji} className="w-full h-full drop-shadow-lg" />
               </div>
-              <div className="overflow-hidden flex flex-col justify-center">
-                <h4 className="font-bold text-xs truncate text-white">{deal.title}</h4>
+              <div className="overflow-hidden flex flex-col justify-center flex-1">
+                <h4 className="font-bold text-xs truncate sm:whitespace-normal sm:line-clamp-2 text-white">{deal.title}</h4>
                 <p className="text-[10px] text-purple-400 font-bold mb-1.5 truncate uppercase tracking-widest">{deal.business}</p>
                 <div className="bg-purple-600 px-2 py-0.5 rounded-full inline-block text-[9px] font-black uppercase tracking-tighter w-fit">
                    {deal.discount}
@@ -212,21 +291,23 @@ const MapPage = () => {
             >
               <div className="w-12 h-1 bg-white/10 rounded-full mx-auto my-4" />
               
-              <div className="h-44 w-full rounded-3xl overflow-hidden mb-6 bg-[#0f071a] flex items-center justify-center border border-white/5 relative">
-                {selectedDeal.image ? (
-                  <img src={selectedDeal.image} className="w-full h-full object-cover" alt="" />
-                ) : (
-                  <div className="text-5xl opacity-40">{selectedDeal.emoji}</div>
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-[#1a0a2e] to-transparent"></div>
+              <div className="h-44 w-full rounded-3xl overflow-hidden mb-6 bg-[#2d1b4e]/30 flex items-center justify-center border border-white/10 relative p-10">
+                <LogoImage 
+                  src={selectedDeal.logo} 
+                  website={selectedDeal.website}
+                  alt={selectedDeal.business} 
+                  emoji={selectedDeal.emoji} 
+                  className="w-24 h-24 drop-shadow-2xl"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#1a0a2e] to-transparent opacity-40"></div>
               </div>
 
-              <div className="flex justify-between items-start mb-8">
-                <div>
-                  <h2 className="text-2xl font-bold mb-1 text-white">{selectedDeal.title}</h2>
-                  <p className="text-purple-400 font-bold uppercase tracking-widest text-[10px]">{selectedDeal.business}</p>
+              <div className="flex justify-between items-start mb-8 gap-4">
+                <div className="min-w-0">
+                  <h2 className="text-xl sm:text-2xl font-bold mb-1 text-white break-words leading-tight">{selectedDeal.title}</h2>
+                  <p className="text-purple-400 font-bold uppercase tracking-widest text-[10px] break-words">{selectedDeal.business}</p>
                 </div>
-                <div className="bg-purple-600 px-4 py-2 rounded-full text-[10px] font-black italic tracking-widest shadow-lg shadow-purple-900/40">
+                <div className="bg-purple-600 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full text-[9px] sm:text-[10px] font-black italic tracking-widest shadow-lg shadow-purple-900/40 shrink-0">
                   {selectedDeal.discount}
                 </div>
               </div>
@@ -272,7 +353,7 @@ const MapPage = () => {
               <div className="space-y-6 mb-12">
                 <div>
                    <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Deal Information</h4>
-                   <p className="text-sm text-slate-300 leading-relaxed font-medium">{selectedDeal.description}</p>
+                   <p className="text-sm text-slate-300 leading-relaxed font-medium break-words">{selectedDeal.description}</p>
                 </div>
                 <div className="flex items-center gap-2 bg-white/5 p-4 rounded-2xl border border-white/5">
                   <MapPin size={16} className="text-purple-400" />
@@ -280,24 +361,48 @@ const MapPage = () => {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-3 mb-12">
-                <button 
-                  onClick={() => handleClaim(selectedDeal)}
+                <div className="flex flex-col gap-3 mb-12">
+                <a 
+                  href={selectedDeal.dealUrl.startsWith('http') ? selectedDeal.dealUrl : `https://${selectedDeal.dealUrl}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (!user) {
+                      signIn();
+                      return;
+                    }
+                    handleStartScan(selectedDeal);
+                  }}
                   className="w-full bg-white text-[#1a0a2e] h-14 rounded-2xl font-bold text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-transform flex items-center justify-center gap-2"
                 >
+                  <QrCode size={20} />
                   Claim Deal
-                </button>
+                </a>
+                
+                <a 
+                  href={selectedDeal.dealUrl.startsWith('http') ? selectedDeal.dealUrl : `https://${selectedDeal.dealUrl}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full bg-[#2d1b4e] text-slate-300 h-14 rounded-2xl font-bold text-xs uppercase tracking-widest border border-white/10 active:scale-95 transition-transform flex items-center justify-center gap-2 hover:bg-white/5"
+                >
+                  <ExternalLink size={16} />
+                  View Source
+                </a>
+
                 <div className="flex gap-3">
-                  <button 
-                    onClick={() => openDirections(selectedDeal.lat, selectedDeal.lng)}
-                    className="flex-1 bg-[#2d1b4e] text-purple-400 border border-white/10 h-14 rounded-2xl font-bold text-xs uppercase tracking-widest active:scale-95 transition-transform flex items-center justify-center gap-3"
+                  <a 
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${selectedDeal.lat},${selectedDeal.lng}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 bg-[#2d1b4e] text-purple-400 border border-white/10 h-14 rounded-2xl font-bold text-xs uppercase tracking-widest active:scale-95 transition-transform flex items-center justify-center gap-3 hover:bg-white/5"
                   >
                     <Crosshair size={18} />
                     Directions
-                  </button>
+                  </a>
                   <button 
                     onClick={() => setSelectedDeal(null)}
-                    className="flex-1 bg-[#2d1b4e] text-slate-400 border border-white/10 h-14 rounded-2xl font-bold text-xs uppercase tracking-widest active:scale-95 transition-transform flex items-center justify-center"
+                    className="flex-1 bg-[#2d1b4e] text-slate-400 border border-white/10 h-14 rounded-2xl font-bold text-xs uppercase tracking-widest active:scale-95 transition-transform flex items-center justify-center hover:bg-white/5"
                   >
                     Close
                   </button>
@@ -305,6 +410,52 @@ const MapPage = () => {
               </div>
             </motion.div>
           </>
+        )}
+      </AnimatePresence>
+
+      {showScanner && (
+        <QRScanner 
+          onScan={handleScanSuccess}
+          onClose={() => {
+            setShowScanner(false);
+            setActiveScannerDeal(null);
+            setScanStatus('idle');
+          }}
+          expectedSecret={activeScannerDeal?.qrSecret}
+        />
+      )}
+
+      {/* Scan Success/Error Feedback Overlay */}
+      <AnimatePresence>
+        {scanStatus !== 'idle' && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            className="fixed bottom-32 left-1/2 -translate-x-1/2 z-[110] px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border backdrop-blur-md"
+            style={{ 
+              backgroundColor: scanStatus === 'success' ? 'rgba(34, 197, 94, 0.9)' : 'rgba(239, 68, 68, 0.9)',
+              borderColor: scanStatus === 'success' ? 'rgba(74, 222, 128, 0.5)' : 'rgba(248, 113, 113, 0.5)'
+            }}
+          >
+            {scanStatus === 'success' ? (
+              <>
+                <CheckCircle2 className="text-white" size={24} />
+                <div className="text-white">
+                  <p className="font-bold text-sm leading-tight tracking-tight uppercase">Redemption Success!</p>
+                  <p className="text-[10px] font-medium opacity-90 uppercase tracking-widest mt-0.5">Your discount is now active</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <AlertCircle className="text-white" size={24} />
+                <div className="text-white">
+                  <p className="font-bold text-sm leading-tight tracking-tight uppercase">Invalid Code</p>
+                  <p className="text-[10px] font-medium opacity-90 uppercase tracking-widest mt-0.5">Please scan the correct QR code</p>
+                </div>
+              </>
+            )}
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
